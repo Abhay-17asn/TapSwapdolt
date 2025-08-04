@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tapswap DOVAZOL</title>
+  <style>
+    body {
+      margin: 0; font-family: sans-serif; background: #121212; color: white;
+    }
+    .page { display: none; padding: 1rem; }
+    .active { display: block; }
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      display: flex; justify-content: space-around; background: #1e1e1e;
+      border-top: 1px solid #333;
+    }
+    .nav-item {
+      flex: 1; text-align: center; padding: 1rem; color: gray;
+    }
+    .nav-item.active { color: #00ff99; }
+    .btn {
+      background: #00ff99; color: black; padding: 0.75rem 1.5rem;
+      border: none; border-radius: 10px; margin-top: 1rem;
+      font-size: 1rem;
+    }
+    .task { margin-bottom: 1rem; padding: 1rem; background: #1e1e1e; border-radius: 10px; }
+    .energy-bar {
+      width: 100%; background: #333; height: 20px; border-radius: 10px;
+      margin-top: 0.5rem;
+    }
+    .energy-fill {
+      height: 100%; background: #00ff99; border-radius: 10px;
+    }
+    input, select {
+      width: 100%; padding: 0.75rem; margin: 0.5rem 0;
+      border-radius: 10px; border: none; font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Pages -->
+<div id="profilePage" class="page active">
+  <h2>👤 Profile</h2>
+  <p><strong>Name:</strong> <span id="name"></span></p>
+  <p><strong>Joined:</strong> <span id="joined"></span></p>
+  <p><strong>Referral Code:</strong> <span id="referral"></span></p>
+  <p><strong>Points:</strong> <span id="profilePoints">0</span></p>
+</div>
+
+<div id="tapPage" class="page">
+  <h2>⚡ Tap DOVAZOL</h2>
+  <button class="btn" onclick="tap()">Tap to Earn</button>
+  <p>Points: <span id="tapPoints">0</span></p>
+  <p>Energy:</p>
+  <div class="energy-bar"><div id="energyFill" class="energy-fill" style="width: 100%"></div></div>
+</div>
+
+<div id="taskPage" class="page">
+  <h2>📺 Watch & Earn</h2>
+  <div id="taskList"></div>
+</div>
+
+<div id="withdrawPage" class="page">
+  <h2>💸 Withdraw</h2>
+  <p>Points: <span id="withdrawPoints">0</span></p>
+  <form onsubmit="handleWithdraw(event)">
+    <label>Method</label>
+    <select id="withdrawMethod">
+      <option value="paypal">PayPal</option>
+      <option value="wire">Wire Transfer</option>
+    </select>
+    <label>Account / UPI ID</label>
+    <input type="text" id="withdrawAccount" required />
+    <label>Amount (Min 10000 pts)</label>
+    <input type="number" id="withdrawAmount" required />
+    <button class="btn">Withdraw</button>
+  </form>
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <div class="nav-item active" onclick="navigate('profile')">Profile</div>
+  <div class="nav-item" onclick="navigate('tap')">Tap</div>
+  <div class="nav-item" onclick="navigate('task')">Task</div>
+  <div class="nav-item" onclick="navigate('withdraw')">Withdraw</div>
+</div>
+
+<script>
+// Local DB
+let db = JSON.parse(localStorage.getItem("tapswap")) || {
+  name: "Unknown",
+  joined: new Date().toLocaleDateString(),
+  referral: "ABC123",
+  points: 0,
+  energy: 100,
+  tasksCompleted: []
+};
+
+const saveDB = () => localStorage.setItem("tapswap", JSON.stringify(db));
+
+// Telegram Init
+if (window.Telegram && Telegram.WebApp) {
+  Telegram.WebApp.ready();
+  const user = Telegram.WebApp.initDataUnsafe?.user;
+  if (user?.first_name) db.name = user.first_name;
+  saveDB();
+}
+
+// Navigation
+function navigate(page) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".nav-item").forEach(p => p.classList.remove("active"));
+  document.getElementById(page + "Page").classList.add("active");
+  event.target.classList.add("active");
+  updateUI();
+}
+
+// Tap Logic
+function tap() {
+  if (db.energy < 10) {
+    alert("Not enough energy! Wait to recharge.");
+    return;
+  }
+  db.points += 100;
+  db.energy -= 10;
+  saveDB();
+  updateUI();
+}
+
+// Energy Recharge
+setInterval(() => {
+  if (db.energy < 100) {
+    db.energy += 1;
+    saveDB();
+    updateUI();
+  }
+}, 5000); // +1 energy every 5s
+
+// Task Rendering
+const tasks = [
+  { id: 1, title: "Watch YouTube Video 1", url: "https://youtu.be/dQw4w9WgXcQ" },
+  { id: 2, title: "Watch YouTube Video 2", url: "https://youtu.be/dQw4w9WgXcQ" },
+  { id: 3, title: "Watch YouTube Video 3", url: "https://youtu.be/dQw4w9WgXcQ" },
+  { id: 4, title: "Watch YouTube Video 4", url: "https://youtu.be/dQw4w9WgXcQ" },
+  { id: 5, title: "Watch YouTube Video 5", url: "https://youtu.be/dQw4w9WgXcQ" }
+];
+
+function renderTasks() {
+  const container = document.getElementById("taskList");
+  container.innerHTML = "";
+  tasks.forEach(task => {
+    const done = db.tasksCompleted.includes(task.id);
+    const div = document.createElement("div");
+    div.className = "task";
+    div.innerHTML = `
+      <p><strong>${task.title}</strong></p>
+      <button class="btn" onclick="completeTask(${task.id})" ${done ? "disabled" : ""}>
+        ${done ? "Completed" : "Watch & Earn 1000"}
+      </button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function completeTask(id) {
+  if (!db.tasksCompleted.includes(id)) {
+    db.points += 1000;
+    db.tasksCompleted.push(id);
+    saveDB();
+    renderTasks();
+    updateUI();
+  }
+}
+
+// Withdraw Handler
+function handleWithdraw(e) {
+  e.preventDefault();
+  const amount = parseInt(document.getElementById("withdrawAmount").value);
+  const account = document.getElementById("withdrawAccount").value;
+  const method = document.getElementById("withdrawMethod").value;
+
+  if (amount < 10000) return alert("Minimum 10000 points required.");
+  if (db.points < amount) return alert("Not enough points.");
+  db.points -= amount;
+  saveDB();
+  alert(`Withdraw request sent!\nMethod: ${method}\nAccount: ${account}\nAmount: ${amount}`);
+  document.getElementById("withdrawAmount").value = "";
+  document.getElementById("withdrawAccount").value = "";
+  updateUI();
+}
+
+// UI Update
+function updateUI() {
+  document.getElementById("name").innerText = db.name;
+  document.getElementById("joined").innerText = db.joined;
+  document.getElementById("referral").innerText = db.referral;
+  document.getElementById("profilePoints").innerText = db.points;
+  document.getElementById("tapPoints").innerText = db.points;
+  document.getElementById("withdrawPoints").innerText = db.points;
+  document.getElementById("energyFill").style.width = db.energy + "%";
+  renderTasks();
+}
+
+updateUI();
+</script>
+
+</body>
+</html>
